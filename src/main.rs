@@ -50,7 +50,7 @@ async fn main_async() -> Result<(), failure::Error> {
     let client = builder.build()?;
 
     // number of pages in search page
-    let page_start = str::parse::<i32>(&std::env::args().nth(1).unwrap_or("97".to_string()))
+    let page_start = str::parse::<i32>(&std::env::args().nth(1).unwrap_or("1".to_string()))
         .expect("Ingresa un número válido.");
     let num_pages = str::parse::<i32>(&std::env::args().nth(2).unwrap_or("97".to_string()))
         .expect("Ingresa un número válido.");
