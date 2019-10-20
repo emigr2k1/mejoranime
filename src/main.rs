@@ -165,8 +165,8 @@ async fn get_anime(client: Client, anime_url: String) -> Result<Anime, failure::
 
         let score = get_text!(&anime_dom, "div.score");
         let score = score.trim();
-        let status = get_text!(&anime_dom, "div.Type");
-        let synopsis = get_text!(&anime_dom, "div.Description");
+        let status = get_text!(&anime_dom, "div.Type small");
+        let synopsis = get_text!(&anime_dom, "div.Description p");
         let title = get_text!(&anime_dom, "h1.Title");
         let release_n_type = get_text!(&anime_dom, "div.after-title small");
 
