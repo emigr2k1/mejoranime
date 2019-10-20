@@ -164,6 +164,7 @@ async fn get_anime(client: Client, anime_url: String) -> Result<Anime, failure::
         let anime_dom = Html::parse_document(&anime_page_txt);
 
         let score = get_text!(&anime_dom, "div.score");
+        let score = score.trim();
         let status = get_text!(&anime_dom, "div.Type");
         let synopsis = get_text!(&anime_dom, "div.Description");
         let title = get_text!(&anime_dom, "h1.Title");
