@@ -132,120 +132,117 @@ async fn do_search(client: Client, page_id: i32) -> Result<Vec<Anime>, failure::
 
 async fn get_anime(client: Client, anime_url: String) -> Result<Anime, failure::Error> {
     log::info!("Robando anime: {}", anime_url);
-    let (mut anime, anime_dom) = {
-        macro_rules! get_text {
-            ($dom:expr, $selector:expr) => {{
-                let sel_res = Selector::parse($selector).map_err(|e| {
-                    format_err!(
-                        "could not parse selector {}: {:#?} for anime: {}",
-                        $selector,
-                        e,
-                        anime_url
-                    )
-                });
-                match sel_res {
-                    Ok(sel) => {
-                        if let Some(el) = $dom.select(&sel).next() {
-                            el.text().next().unwrap_or("-1").to_owned()
-                        } else {
-                            "-1".to_owned()
-                        }
-                    }
-                    Err(e) => {
-                        log::error!("{}", e);
+    macro_rules! get_text {
+        ($dom:expr, $selector:expr) => {{
+            let sel_res = Selector::parse($selector).map_err(|e| {
+                format_err!(
+                    "could not parse selector {}: {:#?} for anime: {}",
+                    $selector,
+                    e,
+                    anime_url
+                )
+            });
+            match sel_res {
+                Ok(sel) => {
+                    if let Some(el) = $dom.select(&sel).next() {
+                        el.text().next().unwrap_or("-1").to_owned()
+                    } else {
                         "-1".to_owned()
                     }
                 }
-            }};
-        }
-
-        let anime_page_txt = client.get(&anime_url).send().await?.text().await?;
-        let anime_dom = Html::parse_document(&anime_page_txt);
-
-        let score = get_text!(&anime_dom, "div.score");
-        let score = score.trim();
-        let status = get_text!(&anime_dom, "div.Type small");
-        let synopsis = get_text!(&anime_dom, "div.Description p");
-        let title = get_text!(&anime_dom, "h1.Title");
-        let release_n_type = get_text!(&anime_dom, "div.after-title small");
-
-        let genres_sel_str = "div.generos a";
-        let genres_sel = Selector::parse(genres_sel_str).map_err(|e| {
-            let err = format_err!(
-                "could not parse genres selector {} for anime {}: {:#?}",
-                genres_sel_str,
-                anime_url,
-                e
-            );
-            log::error!("{}", err);
-            err
-        });
-        let mut genres = Vec::with_capacity(5);
-        match genres_sel {
-            Ok(sel) => {
-                for genre_el in anime_dom.select(&sel) {
-                    genres.push(
-                        genre_el
-                            .text()
-                            .next()
-                            .unwrap_or_else(|| {
-                                log::error!("could not get genres for anime: {}", anime_url);
-                                "-1"
-                            })
-                            .to_owned(),
-                    )
-                }
-            }
-            Err(e) => log::error!("{}", e),
-        }
-
-        let portrait_sel_str = "header figure img";
-        let portrait_sel_res = Selector::parse(portrait_sel_str).map_err(|e| {
-            format_err!(
-                "could not parse selector {} for anime {}: {:#?}",
-                portrait_sel_str,
-                anime_url,
-                e
-            )
-        });
-        let portrait = match portrait_sel_res {
-            Ok(sel) => {
-                if let Some(img_el) = anime_dom.select(&sel).next() {
-                    img_el.value().attr("src").unwrap_or("-1").to_owned()
-                } else {
-                    log::error!("could not find img element for anime: {}", anime_url);
+                Err(e) => {
+                    log::error!("{}", e);
                     "-1".to_owned()
                 }
             }
-            Err(e) => {
-                log::error!("{}", e);
+        }};
+    }
+
+    let anime_page_txt = client.get(&anime_url).send().await?.text().await?;
+    let anime_dom = Html::parse_document(&anime_page_txt);
+
+    let score = get_text!(&anime_dom, "div.score");
+    let score = score.trim();
+    let status = get_text!(&anime_dom, "div.Type small");
+    let synopsis = get_text!(&anime_dom, "div.Description p");
+    let title = get_text!(&anime_dom, "h1.Title");
+    let release_n_type = get_text!(&anime_dom, "div.after-title small");
+
+    let genres_sel_str = "div.generos a";
+    let genres_sel = Selector::parse(genres_sel_str).map_err(|e| {
+        let err = format_err!(
+            "could not parse genres selector {} for anime {}: {:#?}",
+            genres_sel_str,
+            anime_url,
+            e
+        );
+        log::error!("{}", err);
+        err
+    });
+    let mut genres = Vec::with_capacity(5);
+    match genres_sel {
+        Ok(sel) => {
+            for genre_el in anime_dom.select(&sel) {
+                genres.push(
+                    genre_el
+                    .text()
+                    .next()
+                    .unwrap_or_else(|| {
+                        log::error!("could not get genres for anime: {}", anime_url);
+                        "-1"
+                    })
+                    .to_owned(),
+                )
+            }
+        }
+        Err(e) => log::error!("{}", e),
+    }
+
+    let portrait_sel_str = "header figure img";
+    let portrait_sel_res = Selector::parse(portrait_sel_str).map_err(|e| {
+        format_err!(
+            "could not parse selector {} for anime {}: {:#?}",
+            portrait_sel_str,
+            anime_url,
+            e
+        )
+    });
+    let portrait = match portrait_sel_res {
+        Ok(sel) => {
+            if let Some(img_el) = anime_dom.select(&sel).next() {
+                img_el.value().attr("src").unwrap_or("-1").to_owned()
+            } else {
+                log::error!("could not find img element for anime: {}", anime_url);
                 "-1".to_owned()
             }
-        };
-
-        let mut release_n_type = release_n_type.split('|');
-        let release_date = release_n_type
-            .next()
-            .unwrap_or("2000-01-01")
-            .trim()
-            .to_owned();
-        let type_ = release_n_type.next().unwrap_or("Anime").trim().to_owned();
-
-        let anime = Anime {
-            titulo: title,
-            sinopsis: synopsis,
-            puntuacion: str::parse::<f32>(&score).unwrap_or(0.0),
-            fecha_lanzamiento: release_date,
-            tipo: type_,
-            estado: status,
-            generos: genres,
-            portada: portrait,
-            episodios: vec![],
-        };
-        (anime, anime_page_txt)
+        }
+        Err(e) => {
+            log::error!("{}", e);
+            "-1".to_owned()
+        }
     };
 
-    let episodes = get_episodes(client.clone(), anime_dom).await?;
+    let mut release_n_type = release_n_type.split('|');
+    let release_date = release_n_type
+        .next()
+        .unwrap_or("2000-01-01")
+        .trim()
+        .to_owned();
+    let type_ = release_n_type.next().unwrap_or("Anime").trim().to_owned();
+
+    let anime = Anime {
+        titulo: title,
+        sinopsis: synopsis,
+        puntuacion: str::parse::<f32>(&score).unwrap_or(0.0),
+        fecha_lanzamiento: release_date,
+        tipo: type_,
+        estado: status,
+        generos: genres,
+        portada: portrait,
+        episodios: vec![],
+    };
+
+    let episodes = get_episodes(client.clone(), anime_page_txt).await?;
     anime.episodios = episodes;
 
     Ok(anime)
