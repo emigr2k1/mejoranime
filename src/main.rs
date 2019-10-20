@@ -1,5 +1,8 @@
 use failure::format_err;
-use reqwest::Client;
+use reqwest::{
+    header::{HeaderMap, HeaderValue},
+    Client,
+};
 use scraper::{html::Html, Selector};
 
 mod anime;
@@ -28,41 +31,60 @@ fn main() {
 }
 
 async fn main_async() -> Result<(), failure::Error> {
-    let client = Client::new();
+    let builder = reqwest::Client::builder();
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "User-Agent",
+        HeaderValue::from_str("Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:69.0) Gecko/20100101 Firefox/69.0").expect("could not create header"),
+    );
+    headers.insert(
+        "Cookie",
+        HeaderValue::from_str(
+            "__cfduid=d44a5b4504cc07b06a449170a71c2ba001571386115; _gat_gtag_UA_93274214_5=1;_ga=GA1.2.2073919087.1571467207; _gid=GA1.2.368526109.1571467207; AdskeeperStorage=%7B%220%22%3A%7B%22svspr%22%3A%22https%3A%2F%2Fmonoschinos.com%2F%22%2C%22svsds%22%3A1%2C%22TejndEEDj%22%3A%22-oHRSh5P*%22%7D%2C%22C375216%22%3A%7B%22page%22%3A1%2C%22time%22%3A1571467220592%7D%7D; PHPSESSID=3599fac3910f6745e974205d3744b5ab"
+        )?,
+    );
+
+    let builder = builder.default_headers(headers);
+
+    let client = builder.build()?;
 
     // number of pages in search page
-    let num_pages = str::parse::<i32>(&std::env::args().nth(1).unwrap_or("97".to_string()))
+    let page_start = str::parse::<i32>(&std::env::args().nth(1).unwrap_or("97".to_string()))
+        .expect("Ingresa un número válido.");
+    let num_pages = str::parse::<i32>(&std::env::args().nth(2).unwrap_or("97".to_string()))
         .expect("Ingresa un número válido.");
 
-    for i in 1..num_pages + 1 {
+    for i in page_start..num_pages + 1 {
         let client = client.clone();
-        tokio::spawn(async move {
-            match do_search(client, i).await {
-                Ok(animes) => {
-                    use std::fs::OpenOptions;
-                    use std::io::Write;
-                    match OpenOptions::new().create(true).write(true).truncate(true).open(format!("./animes_{}.json", i+1)) {
-                        Ok(mut file) => {
-                            match serde_json::to_string_pretty(&animes) {
-                                Ok(json_str) => {
-                                    match write!(file, "{}", json_str) {
-                                        Err(e) => log::error!("could not write to file: {}", e),
-                                        _ => {}
-                                    }
-                                },
-                                Err(e) => {
-                                    log::error!("could not serialize animes: {}", e);
-                                },
+        match do_search(client, i).await {
+            Ok(animes) => {
+                use std::fs::OpenOptions;
+                use std::io::Write;
+                match OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(true)
+                    .open(format!("./animes_{}.json", i + 1))
+                {
+                    Ok(mut file) => {
+                        match serde_json::to_string_pretty(&animes) {
+                            Ok(json_str) => match write!(file, "{}", json_str) {
+                                Err(e) => log::error!("could not write to file: {}", e),
+                                _ => {}
+                            },
+                            Err(e) => {
+                                log::error!("could not serialize animes: {}", e);
                             }
-                        },
-                        Err(e) => log::error!("could not create file animes_{}.json: {}", i, e),
+                        }
                     }
-                },
-                Err(e) => {
-                    log::error!("could not do search: {}", e);
+                    Err(e) => log::error!("could not create file animes_{}.json: {}", i, e),
                 }
             }
-        });
+            Err(e) => {
+                log::error!("could not do search: {}", e);
+            }
+        }
     }
 
     Ok(())
@@ -86,7 +108,7 @@ async fn do_search(client: Client, page_id: i32) -> Result<Vec<Anime>, failure::
             )
         })?;
 
-            let elems: Vec<_> = dom.select(&anime_sel).collect();
+        let elems: Vec<_> = dom.select(&anime_sel).collect();
         let mut urls: Vec<String> = Vec::with_capacity(30);
         for anime_el in elems {
             if let Some(anime_url) = anime_el.value().attr("href") {
@@ -209,7 +231,6 @@ async fn get_anime(client: Client, anime_url: String) -> Result<Anime, failure::
             .to_owned();
         let type_ = release_n_type.next().unwrap_or("Anime").trim().to_owned();
 
-
         let anime = Anime {
             titulo: title,
             sinopsis: synopsis,
@@ -266,7 +287,7 @@ async fn get_episodes(client: Client, anime_dom: String) -> Result<Vec<Episodio>
     }
 
     Ok(episodes)
-    
+
     //unimplemented!()
 }
 
@@ -376,15 +397,14 @@ mod tests {
     fn test_get_episodes() {
         test_async_fn(async {
             let client = reqwest::Client::new();
-            let dom = 
-                &client
-                    .get("https://monoschinos.com/anime/11eyes-sub-espanol")
-                    .send()
-                    .await
-                    .expect("could not send request")
-                    .text()
-                    .await
-                    .expect("could not read response");
+            let dom = &client
+                .get("https://monoschinos.com/anime/11eyes-sub-espanol")
+                .send()
+                .await
+                .expect("could not send request")
+                .text()
+                .await
+                .expect("could not read response");
 
             let episodes = get_episodes(client.clone(), dom.to_string()).await;
             println!("{:#?}", episodes);
