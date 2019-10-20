@@ -57,34 +57,36 @@ async fn main_async() -> Result<(), failure::Error> {
 
     for i in page_start..num_pages + 1 {
         let client = client.clone();
-        match do_search(client, i).await {
-            Ok(animes) => {
-                use std::fs::OpenOptions;
-                use std::io::Write;
-                match OpenOptions::new()
-                    .create(true)
-                    .write(true)
-                    .truncate(true)
-                    .open(format!("./animes_{}.json", i + 1))
-                {
-                    Ok(mut file) => {
-                        match serde_json::to_string_pretty(&animes) {
-                            Ok(json_str) => match write!(file, "{}", json_str) {
-                                Err(e) => log::error!("could not write to file: {}", e),
-                                _ => {}
-                            },
-                            Err(e) => {
-                                log::error!("could not serialize animes: {}", e);
+        tokio::spawn(async move {
+            match do_search(client, i).await {
+                Ok(animes) => {
+                    use std::fs::OpenOptions;
+                    use std::io::Write;
+                    match OpenOptions::new()
+                        .create(true)
+                        .write(true)
+                        .truncate(true)
+                        .open(format!("./animes_{}.json", i + 1))
+                    {
+                        Ok(mut file) => {
+                            match serde_json::to_string_pretty(&animes) {
+                                Ok(json_str) => match write!(file, "{}", json_str) {
+                                    Err(e) => log::error!("could not write to file: {}", e),
+                                    _ => {}
+                                },
+                                Err(e) => {
+                                    log::error!("could not serialize animes: {}", e);
+                                }
                             }
                         }
+                        Err(e) => log::error!("could not create file animes_{}.json: {}", i, e),
                     }
-                    Err(e) => log::error!("could not create file animes_{}.json: {}", i, e),
+                }
+                Err(e) => {
+                    log::error!("could not do search: {}", e);
                 }
             }
-            Err(e) => {
-                log::error!("could not do search: {}", e);
-            }
-        }
+        });
     }
 
     Ok(())
@@ -165,7 +167,7 @@ async fn get_anime(client: Client, anime_url: String) -> Result<Anime, failure::
 
         let score = get_text!(&anime_dom, "div.score");
         let score = score.trim();
-        let status = get_text!(&anime_dom, "div.Type small");
+        let status = get_text!(&anime_dom, "div.Type").trim().to_owned();
         let synopsis = get_text!(&anime_dom, "div.Description p");
         let title = get_text!(&anime_dom, "h1.Title");
         let release_n_type = get_text!(&anime_dom, "div.after-title small");
