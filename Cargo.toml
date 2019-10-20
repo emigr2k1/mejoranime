@@ -1,0 +1,22 @@
+[package]
+name = "animerobar"
+version = "0.1.0"
+authors = ["Emilio González <emigr2k1@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "0.2.0-alpha.6", features = ["tokio-executor"] }
+reqwest = "0.10.0-alpha.1"
+log = "0.4.8"
+fern = "0.5.8"
+scraper = "0.11.0"
+failure = "0.1.6"
+futures-util-preview = "0.3.0-alpha.19"
+futures-core-preview = "0.3.0-alpha.19"
+htmlescape = "0.3.1"
+url = "2.1.0"
+percent-encoding = "2.1.0"
+serde = { version = "1.0.101", features = ["derive"] }
+serde_json = "1.0.41"
