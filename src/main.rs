@@ -57,34 +57,36 @@ async fn main_async() -> Result<(), failure::Error> {
 
     for i in page_start..num_pages + 1 {
         let client = client.clone();
-        match do_search(client, i).await {
-            Ok(animes) => {
-                use std::fs::OpenOptions;
-                use std::io::Write;
-                match OpenOptions::new()
-                    .create(true)
-                    .write(true)
-                    .truncate(true)
-                    .open(format!("./animes_{}.json", i + 1))
-                {
-                    Ok(mut file) => {
-                        match serde_json::to_string_pretty(&animes) {
-                            Ok(json_str) => match write!(file, "{}", json_str) {
-                                Err(e) => log::error!("could not write to file: {}", e),
-                                _ => {}
-                            },
-                            Err(e) => {
-                                log::error!("could not serialize animes: {}", e);
+        tokio::spawn(async move {
+            match do_search(client, i).await {
+                Ok(animes) => {
+                    use std::fs::OpenOptions;
+                    use std::io::Write;
+                    match OpenOptions::new()
+                        .create(true)
+                        .write(true)
+                        .truncate(true)
+                        .open(format!("./animes_{}.json", i + 1))
+                        {
+                            Ok(mut file) => {
+                                match serde_json::to_string_pretty(&animes) {
+                                    Ok(json_str) => match write!(file, "{}", json_str) {
+                                        Err(e) => log::error!("could not write to file: {}", e),
+                                        _ => {}
+                                    },
+                                    Err(e) => {
+                                        log::error!("could not serialize animes: {}", e);
+                                    }
+                                }
                             }
+                            Err(e) => log::error!("could not create file animes_{}.json: {}", i, e),
                         }
-                    }
-                    Err(e) => log::error!("could not create file animes_{}.json: {}", i, e),
+                }
+                Err(e) => {
+                    log::error!("could not do search: {}", e);
                 }
             }
-            Err(e) => {
-                log::error!("could not do search: {}", e);
-            }
-        }
+        });
     }
 
     Ok(())
@@ -95,30 +97,27 @@ async fn do_search(client: Client, page_id: i32) -> Result<Vec<Anime>, failure::
     let url = format!("https://monoschinos.com/animes?page={}", page_id);
     let search_res_text = client.get(&url).send().await?.text().await?;
 
-    let urls = {
-        let dom = Html::parse_document(&search_res_text);
+    let dom = Html::parse_document(&search_res_text);
 
-        let anime_sel_str = "article a.link-anime";
-        let anime_sel = Selector::parse("article a.link-anime").map_err(|e| {
-            format_err!(
-                "could not parse selector {} for page number {}: {:#?}",
-                anime_sel_str,
-                page_id,
-                e
-            )
-        })?;
+    let anime_sel_str = "article a.link-anime";
+    let anime_sel = Selector::parse("article a.link-anime").map_err(|e| {
+        format_err!(
+            "could not parse selector {} for page number {}: {:#?}",
+            anime_sel_str,
+            page_id,
+            e
+        )
+    })?;
 
-        let elems: Vec<_> = dom.select(&anime_sel).collect();
-        let mut urls: Vec<String> = Vec::with_capacity(30);
-        for anime_el in elems {
-            if let Some(anime_url) = anime_el.value().attr("href") {
-                urls.push(anime_url.to_owned());
-            } else {
-                log::error!("could not get link for anime: {:#?}", anime_el.value());
-            }
+    let elems: Vec<_> = dom.select(&anime_sel).collect();
+    let mut urls: Vec<String> = Vec::with_capacity(30);
+    for anime_el in elems {
+        if let Some(anime_url) = anime_el.value().attr("href") {
+            urls.push(anime_url.to_owned());
+        } else {
+            log::error!("could not get link for anime: {:#?}", anime_el.value());
         }
-        urls
-    };
+    }
 
     let mut animes: Vec<Anime> = Vec::with_capacity(30);
     for url in urls {
