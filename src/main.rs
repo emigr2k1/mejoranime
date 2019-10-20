@@ -15,6 +15,7 @@ fn main() {
                 message,
             ))
         })
+        .level(log::LevelFilter::Info)
         .chain(std::io::stdout())
         .chain(fern::log_file("log.txt").expect("could not create log file"))
         .apply()
