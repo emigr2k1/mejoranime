@@ -148,7 +148,11 @@ async fn get_anime(client: Client, anime_url: String) -> Result<Anime, failure::
                 match sel_res {
                     Ok(sel) => {
                         if let Some(el) = $dom.select(&sel).next() {
-                            el.text().next().unwrap_or("-1").to_owned()
+                            if $selector == "div.Type" {
+                                el.text().nth(1).unwrap_or("-1").to_owned()
+                            } else {
+                                el.text().next().unwrap_or("-1").to_owned()
+                            }
                         } else {
                             "-1".to_owned()
                         }
