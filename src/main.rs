@@ -186,6 +186,7 @@ async fn get_anime(client: Client, anime_url: String) -> Result<Anime, failure::
             log::error!("{}", err);
             err
         });
+
         let mut genres = Vec::with_capacity(5);
         match genres_sel {
             Ok(sel) => {
