@@ -36,7 +36,10 @@ async fn main_async() -> Result<(), failure::Error> {
     let mut headers = HeaderMap::new();
     headers.insert(
         "User-Agent",
-        HeaderValue::from_str("Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:69.0) Gecko/20100101 Firefox/69.0").expect("could not create header"),
+        HeaderValue::from_str(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:69.0) Gecko/20100101 Firefox/69.0",
+        )
+        .expect("could not create header"),
     );
     headers.insert(
         "Cookie",
@@ -57,36 +60,32 @@ async fn main_async() -> Result<(), failure::Error> {
 
     for i in page_start..num_pages + 1 {
         let client = client.clone();
-        tokio::spawn(async move {
-            match do_search(client, i).await {
-                Ok(animes) => {
-                    use std::fs::OpenOptions;
-                    use std::io::Write;
-                    match OpenOptions::new()
-                        .create(true)
-                        .write(true)
-                        .truncate(true)
-                        .open(format!("./animes_{}.json", i + 1))
-                    {
-                        Ok(mut file) => {
-                            match serde_json::to_string_pretty(&animes) {
-                                Ok(json_str) => match write!(file, "{}", json_str) {
-                                    Err(e) => log::error!("could not write to file: {}", e),
-                                    _ => {}
-                                },
-                                Err(e) => {
-                                    log::error!("could not serialize animes: {}", e);
-                                }
-                            }
+        match do_search(client, i).await {
+            Ok(animes) => {
+                use std::fs::OpenOptions;
+                use std::io::Write;
+                match OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(true)
+                    .open(format!("./animes_{}.json", i + 1))
+                {
+                    Ok(mut file) => match serde_json::to_string_pretty(&animes) {
+                        Ok(json_str) => match write!(file, "{}", json_str) {
+                            Err(e) => log::error!("could not write to file: {}", e),
+                            _ => {}
+                        },
+                        Err(e) => {
+                            log::error!("could not serialize animes: {}", e);
                         }
-                        Err(e) => log::error!("could not create file animes_{}.json: {}", i, e),
-                    }
-                }
-                Err(e) => {
-                    log::error!("could not do search: {}", e);
+                    },
+                    Err(e) => log::error!("could not create file animes_{}.json: {}", i, e),
                 }
             }
-        });
+            Err(e) => {
+                log::error!("could not do search: {}", e);
+            }
+        }
     }
 
     Ok(())
